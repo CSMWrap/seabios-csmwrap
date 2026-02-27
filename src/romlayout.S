@@ -499,17 +499,24 @@ bios_proxy_helper_16_entry:
 .Lstore_apic_id:
         movl %eax, 32(%ebp)         // Write to helper_core_id (offset 32)
 
-        // Signal that helper is ready
-        movl $1, (%esi)
-
         // Check if MONITOR/MWAIT is supported (CPUID.01H:ECX.MONITOR[bit 3])
-        // Use ESI as flag: 1 = use mwait, 0 = use pause
+        // Save helper_ready address before ESI is reused for mwait flag
+        movl %esi, %edi                 // EDI = helper_ready address
         movl $1, %eax
         cpuid
         xorl %esi, %esi                 // Default: no mwait
         testl $(1 << 3), %ecx
-        jz .Lhelper_poll_loop
+        jz .Lhelper_first_check
         movl $1, %esi                   // mwait supported
+
+.Lhelper_first_check:
+        // Check mailbox once before signalling ready, so that by the time
+        // the main core sees the flag, we are guaranteed to be polling.
+        cmpl $0, 8(%ebp)
+        jne .Lhelper_handle_request
+
+        // Signal ready — we have already checked and are now in the loop
+        movl $1, (%edi)
 
 .Lhelper_poll_loop:
         cmpl $0, 8(%ebp)
