@@ -54,7 +54,12 @@ mptable_setup(void)
         pkgcpus = (ebx >> 16) & 0xff;
         pkgcpus = 1 << (__fls(pkgcpus - 1) + 1); /* round up to power of 2 */
     }
-    u8 apic_version = readl((u8*)BUILD_APIC_ADDR + 0x30) & 0xff;
+    u8 apic_version;
+    u64 apic_base = rdmsr(0x1b);
+    if (apic_base & (1 << 10))  /* x2APIC mode: use MSR */
+        apic_version = rdmsr(0x803) & 0xff;
+    else
+        apic_version = readl((u8*)BUILD_APIC_ADDR + 0x30) & 0xff;
 
     // CPU definitions.
     struct mpt_cpu *cpus = (void*)&config[1], *cpu = cpus;
