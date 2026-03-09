@@ -11,6 +11,7 @@
 #include "hw/pci.h" // pci_to_bdf
 #include "hw/pcidevice.h" // pci_probe_devices
 #include "hw/pic.h" // pic_irqmask_read
+#include "hw/ps2port.h" // ps2port_setup
 #include "malloc.h" // malloc_csm_preinit
 #include "memmap.h" // SYMBOL
 #include "output.h" // dprintf
@@ -43,6 +44,7 @@ EFI_TO_COMPATIBILITY16_INIT_TABLE *csm_init_table;
 EFI_TO_COMPATIBILITY16_BOOT_TABLE *csm_boot_table;
 
 static u16 PICMask = PIC_IRQMASK_DEFAULT;
+static int oprom_hw_init_done;
 
 extern void __csm_return(struct bregs *regs) __noreturn;
 
@@ -197,11 +199,13 @@ handle_csm_0002(struct bregs *regs)
     struct bios_data_area_s *bda = MAKE_FLATPTR(SEG_BDA, 0);
     bda->hdcount = 0;
 
-    pic_setup();
+    if (!oprom_hw_init_done)
+        pic_setup();
     thread_setup();
     mathcp_setup();
     timer_setup();
-    clock_setup();
+    if (!oprom_hw_init_done)
+        clock_setup();
     device_hardware_setup();
     wait_threads();
     interactive_bootmenu();
@@ -253,6 +257,16 @@ handle_csm_0005(struct bregs *regs)
     bdf = pci_bus_devfn_to_bdf(table->PciBus, table->PciDeviceFunction);
 
     rom_reserve(rom->size * 512);
+
+    // Set up PIC, PIT, timer, and keyboard so option ROMs can use
+    // timer delays and keyboard input.  These are normally deferred to
+    // PrepareToBoot, but option ROMs need them earlier.
+    if (!oprom_hw_init_done) {
+        pic_setup();
+        clock_setup();
+        ps2port_setup();
+        oprom_hw_init_done = 1;
+    }
 
     // XX PnP seg/ofs should never be other than default
     callrom(rom, bdf);
