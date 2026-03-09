@@ -534,6 +534,10 @@ ps2port_setup(void)
     ASSERT32FLAT();
     if (! CONFIG_PS2PORT)
         return;
+    static int ps2port_init_done;
+    if (ps2port_init_done)
+        return;
+    ps2port_init_done = 1;
     if (acpi_dsdt_present_eisaid(0x0303) == 0) {
         dprintf(1, "ACPI: no PS/2 keyboard present\n");
         return;
