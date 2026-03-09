@@ -21,6 +21,7 @@
 #include "std/acpi.h" // RSDP_SIGNATURE
 #include "std/bda.h" // struct bios_data_area_s
 #include "std/optionrom.h" // struct rom_header
+#include "std/pnpbios.h" // PNP_SIGNATURE
 #include "util.h" // copy_smbios_21
 
 #define UINT8 u8
@@ -273,7 +274,28 @@ handle_csm_0005(struct bregs *regs)
 
     rom_confirm(rom->size * 512);
 
-    regs->bx = 0; // FIXME
+    // Register BEV/BCV boot entries from the ROM's PnP header.
+    // ROMs without PnP (e.g. VGA) don't need boot entries - they
+    // register themselves via INT hooks if needed.
+    struct pnp_data *pnp = (void*)((u8*)rom + rom->pnpoffset);
+    if (pnp->signature == PNP_SIGNATURE) {
+        while (pnp) {
+            if (pnp->bev)
+                boot_add_bev(FLATPTR_TO_SEG(rom), pnp->bev,
+                             pnp->productname, -1);
+            else if (pnp->bcv)
+                boot_add_bcv(FLATPTR_TO_SEG(rom), pnp->bcv,
+                             pnp->productname, -1);
+            else
+                break;
+            pnp = pnp->nextoffset
+                ? (void*)((u8*)rom + pnp->nextoffset) : NULL;
+            if (pnp && pnp->signature != PNP_SIGNATURE)
+                pnp = NULL;
+        }
+    }
+
+    regs->bx = 0;
     regs->ax = 0;
 }
 
