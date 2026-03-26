@@ -43,6 +43,10 @@ struct bios_proxy_mailbox {
     u32 arg_ecx;                /* offset 24: Argument passed in ECX */
     u32 result;                 /* offset 28: Return value from function */
     u32 helper_core_id;         /* offset 32: APIC ID of helper core */
+    /* UEFI reset callback fields (populated by CSMWrap) */
+    u32 reset_cr3;              /* offset 36: CR3 for 64-bit identity mapping */
+    u32 reset_fn_lo;            /* offset 40: ResetSystem() address (low) */
+    u32 reset_fn_hi;            /* offset 44: ResetSystem() address (high) */
 };
 
 /*
@@ -334,6 +338,46 @@ init_bios_proxy_addr(void)
     SET_FARVAR(FLATPTR_TO_SEG(__addr),                                          \
                *(typeof(bios_proxy.field) *)FLATPTR_TO_OFFSET(__addr), (val));  \
 } while (0)
+
+/*
+ * Transition to 64-bit long mode and call UEFI ResetSystem().
+ * Defined in romlayout.S.  Does not return.
+ * regparm(3): EAX=efi_type, EDX=cr3, ECX=fn_lo; stack arg: fn_hi
+ */
+extern void uefi_reset_call(u32 efi_type, u32 cr3, u32 fn_lo, u32 fn_hi)
+    __noreturn;
+
+/*
+ * Request a system reset via the UEFI runtime services callback.
+ * type: 1=cold, 2=warm, 3=shutdown (maps to EFI_RESET_TYPE by subtracting 1).
+ *
+ * In 16-bit mode, dispatches via call32() to the helper core (which is
+ * in 32-bit protected mode).  In 32-bit mode, calls uefi_reset_call()
+ * directly.  Returns -1 if UEFI reset is not available.
+ */
+int VISIBLE32FLAT
+bios_proxy_reset(int type)
+{
+    if (MODE16)
+        return call32(bios_proxy_reset, type, -1);
+
+    u32 mb = find_bios_proxy();
+    if (!mb)
+        return -1;
+
+    u32 fn_lo = GET_PROXY_AT(mb, reset_fn_lo);
+    u32 fn_hi = GET_PROXY_AT(mb, reset_fn_hi);
+    if (!fn_lo && !fn_hi)
+        return -1;
+
+    u32 cr3 = GET_PROXY_AT(mb, reset_cr3);
+    if (!cr3)
+        return -1;
+
+    dprintf(1, "UEFI reset (type=%d) via ResetSystem()\n", type);
+    uefi_reset_call(type - 1, cr3, fn_lo, fn_hi);
+    /* Not reached */
+}
 
 static u32
 call32_proxy(void *func, u32 eax, u32 edx, u32 ecx)

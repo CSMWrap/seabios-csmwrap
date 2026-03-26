@@ -526,7 +526,7 @@ bios_proxy_helper_16_entry:
         testl %esi, %esi
         jz .Lhelper_do_pause
 
-        // MONITOR/MWAIT path
+        // MONITOR/MWAIT path - monitor the request_pending field
         leal 8(%ebp), %eax              // EAX = address to monitor (request_pending)
         xorl %ecx, %ecx                 // ECX = extensions (0)
         xorl %edx, %edx                 // EDX = hints (0)
@@ -571,6 +571,101 @@ bios_proxy_helper_16_entry:
         movl $0, 8(%ebp)
 
         jmp .Lhelper_poll_loop
+
+        /*
+         * uefi_reset_call - Transition to 64-bit and call ResetSystem()
+         *
+         * Callable from 32-bit protected mode (helper core context).
+         * Uses regparm(3): EAX = EFI_RESET_TYPE, EDX = CR3, ECX = fn_lo
+         * Stack argument: fn_hi (at 4(%esp), after return address)
+         *
+         * Does NOT return.
+         */
+        DECLFUNC uefi_reset_call
+        .global uefi_reset_call
+uefi_reset_call:
+        cli
+
+        // Save args in callee-saved regs
+        movl %eax, %ebx                // EBX = EFI_RESET_TYPE
+        movl %ecx, %edi                // EDI = fn_lo
+        movl 4(%esp), %esi             // ESI = fn_hi
+
+        // Step 1: Enable PAE in CR4
+        movl %cr4, %eax
+        orl $(1 << 5), %eax
+        movl %eax, %cr4
+
+        // Step 2: Load identity-mapping page tables
+        movl %edx, %cr3
+
+        // Step 3: Enable Long Mode (EFER.LME)
+        movl $0xC0000080, %ecx
+        rdmsr
+        orl $(1 << 8), %eax
+        wrmsr
+
+        // Step 4: Load 64-bit GDT
+        lgdtl (.Lreset_gdt_ptr + BUILD_BIOS_ADDR)
+
+        // Step 5: Enable Paging (activates Long Mode since EFER.LME is set)
+        movl %cr0, %eax
+        orl $(1 << 31), %eax
+        movl %eax, %cr0
+
+        // Step 6: Far jump to 64-bit code segment (selector 0x08)
+        ljmpl $0x08, $(.Lreset_64bit + BUILD_BIOS_ADDR)
+
+        .code64
+.Lreset_64bit:
+        // Now in 64-bit Long Mode
+        movw $0x10, %ax
+        movw %ax, %ds
+        movw %ax, %es
+        movw %ax, %ss
+        movw %ax, %fs
+        movw %ax, %gs
+
+        // Reconstruct 64-bit ResetSystem pointer from EDI:ESI
+        movl %edi, %eax                // Zero-extends to RAX
+        movl %esi, %edx                // Zero-extends to RDX
+        shlq $32, %rdx
+        orq %rdx, %rax
+
+        // MS x64 calling convention for ResetSystem:
+        //   RCX = EFI_RESET_TYPE
+        //   RDX = EFI_STATUS (EFI_SUCCESS = 0)
+        //   R8  = DataSize (0)
+        //   R9  = ResetData (NULL)
+        movl %ebx, %ecx
+        xorl %edx, %edx
+        xorl %r8d, %r8d
+        xorl %r9d, %r9d
+
+        // Align stack to 16 bytes and allocate shadow space (MS x64 ABI)
+        andq $~0xF, %rsp
+        subq $32, %rsp
+
+        // Call ResetSystem - should NOT return
+        callq *%rax
+
+        // If it returns, halt forever
+.Lreset_halt:
+        cli
+        hlt
+        jmp .Lreset_halt
+
+        .code32
+
+        // 64-bit GDT for the reset path (embedded in F-segment)
+        .balign 8
+.Lreset_gdt:
+        .quad 0x0000000000000000        // [0x00] Null descriptor
+        .quad 0x00AF9A000000FFFF        // [0x08] Code64: L=1 D=0 P=1 DPL=0 Execute/Read
+        .quad 0x00CF92000000FFFF        // [0x10] Data64: B=1 P=1 DPL=0 Read/Write
+.Lreset_gdt_ptr:
+        .word (3 * 8 - 1)                              // Limit = 23
+        .long (.Lreset_gdt + BUILD_BIOS_ADDR)           // Base (32-bit)
 
         .code16
 
