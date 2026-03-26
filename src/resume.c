@@ -125,7 +125,10 @@ tryReboot(void)
 {
     dprintf(1, "Attempting a hard reboot\n");
 
-    // Use a QEMU specific reboot on QEMU
+    // Try UEFI RuntimeServices->ResetSystem(EfiResetCold) via helper core
+    bios_proxy_reset(1);
+
+    // Fallback: Use a QEMU specific reboot on QEMU
     qemu_reboot();
 
     // Reboot using ACPI RESET_REG

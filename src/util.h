@@ -9,6 +9,9 @@ void apm_shutdown(void);
 struct bregs;
 void handle_1553(struct bregs *regs);
 
+// stacks.c - UEFI reset via helper core
+int bios_proxy_reset(int type);
+
 // bmp.c
 struct bmp_decdata *bmp_alloc(void);
 int bmp_decode(struct bmp_decdata *bmp, unsigned char *data, int data_size);
