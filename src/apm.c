@@ -89,6 +89,11 @@ handle_155306(struct bregs *regs)
 void
 apm_shutdown(void)
 {
+    /* Try UEFI RuntimeServices->ResetSystem(EfiResetShutdown) via helper core */
+    bios_proxy_reset(3);
+
+    /* Fallback: direct ACPI S5 shutdown (may not work properly on all HW) */
+    dprintf(1, "UEFI shutdown unavailable, falling back to direct ACPI S5\n");
     u16 pm1a_cnt = GET_GLOBAL(acpi_pm1a_cnt);
     if (pm1a_cnt)
         outw(0x2000, pm1a_cnt);
