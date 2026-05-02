@@ -164,10 +164,11 @@ handle_csm_0002(struct bregs *regs)
         e820_add(hi_pmm_end - BUILD_MIN_HIGHTABLE, BUILD_MIN_HIGHTABLE, E820_RESERVED);
     }
 
-    // For PCIBIOS 1ab10e
+    // For PCIBIOS 1ab10e. Relocate to F-segment so legacy software that
+    // scans 0xF0000-0xFFFFF for the "$PIR" signature can find it as well.
     if (csm_compat_table.IrqRoutingTablePointer &&
         csm_compat_table.IrqRoutingTableLength) {
-        PirAddr = (void *)csm_compat_table.IrqRoutingTablePointer;
+        copy_pir((void *)csm_compat_table.IrqRoutingTablePointer);
         dprintf(3, "CSM PIRQ table at %p\n", PirAddr);
     }
 
