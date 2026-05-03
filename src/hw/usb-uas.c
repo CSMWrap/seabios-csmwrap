@@ -234,8 +234,9 @@ usb_uas_setup(struct usbdevice_s *usbdev)
     struct usb_pipe *data_in = NULL;
     struct usb_pipe *data_out = NULL;
     u8 *desc = (u8*)iface;
-    while (desc) {
-        desc += desc[0];
+    u8 *end = (u8*)iface + usbdev->imax;
+    for (desc += desc[0]; desc + 2 <= end && desc[0] >= 2
+             && desc + desc[0] <= end; desc += desc[0]) {
         switch (desc[1]) {
         case USB_DT_ENDPOINT:
             ep = (void*)desc;
@@ -245,6 +246,8 @@ usb_uas_setup(struct usbdevice_s *usbdev)
             dprintf(1, "Superspeed UAS devices not supported (yet)\n");
             goto fail;
         case 0x24:
+            if (desc[0] < 3 || !ep)
+                goto fail;
             switch (desc[2]) {
             case UAS_PIPE_ID_COMMAND:
                 command = usb_alloc_pipe(usbdev, ep);
@@ -263,10 +266,10 @@ usb_uas_setup(struct usbdevice_s *usbdev)
             }
             break;
         default:
-            desc = NULL;
-            break;
+            goto done;
         }
     }
+done:
     if (!command || !status || !data_in || !data_out)
         goto fail;
 
