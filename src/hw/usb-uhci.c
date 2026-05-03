@@ -67,7 +67,7 @@ uhci_hub_reset(struct usbhub_s *hub, u32 port)
 
     // Finish reset on port
     outw(0, ioport);
-    udelay(6); // 64 high-speed bit times
+    msleep(USB_TIME_RSTRCY);
     u16 status = inw(ioport);
     if (!(status & USBPORTSC_CCS))
         // No longer connected
