@@ -755,7 +755,7 @@ static void xhci_process_events(struct usb_xhci_s *xhci)
         evts->nidx = nidx;
         struct xhci_ir *ir = xhci->ir;
         u32 erdp = (u32)(evts->ring + nidx);
-        writel(&ir->erdp_low, erdp);
+        writel(&ir->erdp_low, erdp | (1<<3));
         writel(&ir->erdp_high, 0);
     }
 }
