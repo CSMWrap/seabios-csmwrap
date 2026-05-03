@@ -67,8 +67,7 @@ ohci_hub_reset(struct usbhub_s *hub, u32 port)
     u32 end = timer_calc(USB_TIME_DRSTR * 2);
     for (;;) {
         sts = readl(&cntl->regs->roothub_portstatus[port]);
-        if (!(sts & RH_PS_PRS))
-            // XXX - need to ensure USB_TIME_DRSTR time in reset?
+        if (sts & RH_PS_PRSC)
             break;
         if (timer_check(end)) {
             // Timeout.
@@ -78,6 +77,11 @@ ohci_hub_reset(struct usbhub_s *hub, u32 port)
         }
         yield();
     }
+
+    // Acknowledge reset complete change bit and observe reset recovery.
+    writel(&cntl->regs->roothub_portstatus[port], RH_PS_PRSC);
+    msleep(USB_TIME_RSTRCY);
+    sts = readl(&cntl->regs->roothub_portstatus[port]);
 
     if ((sts & (RH_PS_CCS|RH_PS_PES)) != (RH_PS_CCS|RH_PS_PES))
         // Device no longer present
