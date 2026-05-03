@@ -188,11 +188,8 @@ usb_hub_setup(struct usbdevice_s *usbdev)
 
     // Turn on power to ports.
     int port;
-    for (port=0; port<desc.bNbrPorts; port++) {
-        ret = set_port_feature(&hub, port, USB_PORT_FEAT_POWER);
-        if (ret)
-            return ret;
-    }
+    for (port=0; port<desc.bNbrPorts; port++)
+        set_port_feature(&hub, port, USB_PORT_FEAT_POWER);
     // Wait for port power to stabilize.
     msleep(desc.bPwrOn2PwrGood * 2);
 
