@@ -1005,6 +1005,8 @@ xhci_alloc_pipe(struct usbdevice_s *usbdev
     if (eptype == USB_ENDPOINT_XFER_INT)
         ep->ctx[0] = (usb_get_period(usbdev, epdesc) + 3) << 16;
     ep->ctx[1]   |= eptype << 3;
+    if (eptype != USB_ENDPOINT_XFER_ISOC)
+        ep->ctx[1] |= 3 << 1;
     if (epdesc->bEndpointAddress & USB_DIR_IN
         || eptype == USB_ENDPOINT_XFER_CONTROL)
         ep->ctx[1] |= 1 << 5;
