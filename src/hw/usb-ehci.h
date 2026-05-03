@@ -32,6 +32,11 @@ struct ehci_caps {
 
 #define HCS_N_PORTS_MASK 0xf
 
+#define EHCI_EXTCAP_LEGSUP        0x01
+#define EHCI_USBLEGSUP_BIOS       (1 << 16)
+#define EHCI_USBLEGSUP_OS         (1 << 24)
+#define EHCI_USBLEGCTLSTS         0x04
+
 struct ehci_regs {
     u32 usbcmd;
     u32 usbsts;

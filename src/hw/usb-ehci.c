@@ -9,6 +9,7 @@
 #include "output.h" // dprintf
 #include "malloc.h" // free
 #include "memmap.h" // PAGE_SIZE
+#include "pci.h" // pci_config_readl
 #include "pcidevice.h" // foreachpci
 #include "pci_ids.h" // PCI_CLASS_SERIAL_USB_UHCI
 #include "pci_regs.h" // PCI_BASE_ADDRESS_0
@@ -319,6 +320,35 @@ fail:
 }
 
 static void
+ehci_legacy_handoff(struct pci_device *pci, u32 hcc_params)
+{
+    u32 eecp = (hcc_params >> 8) & 0xff;
+    int loops = 0;
+    while (eecp >= 0x40 && loops++ < 64) {
+        u32 cap = pci_config_readl(pci->bdf, eecp);
+        if ((cap & 0xff) == EHCI_EXTCAP_LEGSUP) {
+            pci_config_writel(pci->bdf, eecp, cap | EHCI_USBLEGSUP_OS);
+            u32 end = timer_calc(1000);
+            for (;;) {
+                cap = pci_config_readl(pci->bdf, eecp);
+                if (!(cap & EHCI_USBLEGSUP_BIOS))
+                    break;
+                if (timer_check(end)) {
+                    warn_timeout();
+                    pci_config_writel(pci->bdf, eecp,
+                                      cap & ~EHCI_USBLEGSUP_BIOS);
+                    break;
+                }
+                yield();
+            }
+            pci_config_writel(pci->bdf, eecp + EHCI_USBLEGCTLSTS, 0);
+            return;
+        }
+        eecp = (cap >> 8) & 0xff;
+    }
+}
+
+static void
 ehci_controller_setup(struct pci_device *pci)
 {
     struct ehci_caps *caps = pci_enable_membar(pci, PCI_BASE_ADDRESS_0);
@@ -344,8 +374,7 @@ ehci_controller_setup(struct pci_device *pci)
     dprintf(1, "EHCI init on dev %pP (regs=%p)\n", pci, cntl->regs);
 
     pci_enable_busmaster(pci);
-
-    // XXX - check for and disable SMM control?
+    ehci_legacy_handoff(pci, hcc_params);
 
     run_thread(configure_ehci, cntl);
 }
