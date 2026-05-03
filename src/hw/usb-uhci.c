@@ -167,11 +167,31 @@ reset_uhci(struct usb_uhci_s *cntl, u16 bdf)
     // Reset PIRQ and SMI
     pci_config_writew(bdf, USBLEGSUP, USBLEGSUP_RWC);
 
-    // Reset the HC
-    outw(USBCMD_HCRESET, cntl->iobase + USBCMD);
-    udelay(5);
+    // Stop the HC and wait for it to halt before resetting.
+    outw(0, cntl->iobase + USBINTR);
+    outw(0, cntl->iobase + USBCMD);
+    u32 end = timer_calc(16);
+    while (!(inw(cntl->iobase + USBSTS) & USBSTS_HCH)) {
+        if (timer_check(end)) {
+            warn_timeout();
+            break;
+        }
+        yield();
+    }
 
-    // Disable interrupts and commands (just to be safe).
+    // Reset the HC and wait for HCRESET to self clear.
+    outw(USBCMD_HCRESET, cntl->iobase + USBCMD);
+    end = timer_calc(16);
+    while (inw(cntl->iobase + USBCMD) & USBCMD_HCRESET) {
+        if (timer_check(end)) {
+            warn_timeout();
+            break;
+        }
+        yield();
+    }
+
+    // Clear status bits and disable interrupts and commands.
+    outw(0xff, cntl->iobase + USBSTS);
     outw(0, cntl->iobase + USBINTR);
     outw(0, cntl->iobase + USBCMD);
 }
