@@ -743,9 +743,10 @@ static void xhci_process_events(struct usb_xhci_s *xhci)
             u32 port = ((etrb->ptr_low >> 24) & 0xff) - 1;
             // Read status, and clear port status change bits
             u32 portsc = readl(&xhci->pr[port].portsc);
-            u32 pclear = (((portsc & ~(XHCI_PORTSC_PED|XHCI_PORTSC_PR))
-                           & ~(XHCI_PORTSC_PLS_MASK<<XHCI_PORTSC_PLS_SHIFT))
-                          | (1<<XHCI_PORTSC_PLS_SHIFT));
+            u32 pclear = portsc & ~(XHCI_PORTSC_PED | XHCI_PORTSC_PR
+                                    | XHCI_PORTSC_LWS
+                                    | (XHCI_PORTSC_PLS_MASK
+                                       << XHCI_PORTSC_PLS_SHIFT));
             writel(&xhci->pr[port].portsc, pclear);
 
             xhci_print_port_state(3, __func__, port, portsc);
