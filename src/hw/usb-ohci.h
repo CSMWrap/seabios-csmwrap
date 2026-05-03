@@ -102,12 +102,15 @@ struct ohci_regs {
 #define OHCI_CTRL_HCFS  (3 << 6)
 #       define OHCI_USB_RESET   (0 << 6)
 #       define OHCI_USB_OPER    (2 << 6)
+#define OHCI_CTRL_IR    (1 << 8)
 #define OHCI_CTRL_RWC   (1 << 9)
 
 #define OHCI_HCR        (1 << 0)
 #define OHCI_CLF        (1 << 1)
 #define OHCI_BLF        (1 << 2)
+#define OHCI_OCR        (1 << 3)
 
+#define OHCI_INTR_OC    (1 << 30)
 #define OHCI_INTR_MIE   (1 << 31)
 
 #define RH_PS_CCS            0x00000001
