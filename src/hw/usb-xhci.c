@@ -493,7 +493,7 @@ configure_xhci(void *data)
     u32 spb = (reg >> 21 & 0x1f) << 5 | reg >> 27;
     if (spb) {
         dprintf(3, "%s: setup %d scratch pad buffers\n", __func__, spb);
-        u64 *spba = memalign_high(64, sizeof(*spba) * spb);
+        u64 *spba = memalign_high(PAGE_SIZE, sizeof(*spba) * spb);
         void *pad = memalign_high(PAGE_SIZE, PAGE_SIZE * spb);
         if (!spba || !pad) {
             warn_noalloc();
@@ -503,7 +503,7 @@ configure_xhci(void *data)
         }
         int i;
         for (i = 0; i < spb; i++)
-            spba[i] = (u32)pad + (i * PAGE_SIZE);
+            spba[i] = (u64)(u32)pad + (i * PAGE_SIZE);
         xhci->devs[0].ptr_low = (u32)spba;
         xhci->devs[0].ptr_high = 0;
     }
