@@ -57,14 +57,12 @@ ehci_hub_detect(struct usbhub_s *hub, u32 port)
 
     if ((portsc & PORT_LINESTATUS_MASK) == PORT_LINESTATUS_KSTATE) {
         // low speed device
-        writel(portreg, portsc | PORT_OWNER);
+        writel(portreg, (portsc & ~PORT_RWC_BITS) | PORT_OWNER);
         return -1;
     }
 
-    // XXX - if just powered up, need to wait for USB_TIME_ATTDB?
-
     // Begin reset on port
-    portsc = (portsc & ~PORT_PE) | PORT_RESET;
+    portsc = (portsc & ~(PORT_PE | PORT_RWC_BITS)) | PORT_RESET;
     writel(portreg, portsc);
     msleep(USB_TIME_DRSTR);
     return 1;
@@ -79,7 +77,7 @@ ehci_hub_reset(struct usbhub_s *hub, u32 port)
     u32 portsc = readl(portreg);
 
     // Finish reset on port
-    portsc &= ~PORT_RESET;
+    portsc &= ~(PORT_RESET | PORT_RWC_BITS);
     writel(portreg, portsc);
     msleep(EHCI_TIME_POSTRESET);
 
@@ -89,7 +87,7 @@ ehci_hub_reset(struct usbhub_s *hub, u32 port)
         return -1;
     if (!(portsc & PORT_PE)) {
         // full speed device
-        writel(portreg, portsc | PORT_OWNER);
+        writel(portreg, (portsc & ~PORT_RWC_BITS) | PORT_OWNER);
         return -1;
     }
 
@@ -103,7 +101,7 @@ ehci_hub_disconnect(struct usbhub_s *hub, u32 port)
     struct usb_ehci_s *cntl = container_of(hub->cntl, struct usb_ehci_s, usb);
     u32 *portreg = &cntl->regs->portsc[port];
     u32 portsc = readl(portreg);
-    writel(portreg, portsc & ~PORT_PE);
+    writel(portreg, portsc & ~(PORT_PE | PORT_RWC_BITS));
 }
 
 static struct usbhub_op_s ehci_HubOp = {
