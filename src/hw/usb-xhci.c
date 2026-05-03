@@ -415,6 +415,18 @@ static struct usbhub_op_s xhci_hub_ops = {
 static int
 xhci_check_ports(struct usb_xhci_s *xhci)
 {
+    // Apply port power to ports that are not already powered.
+    int i;
+    for (i = 0; i < xhci->ports; i++) {
+        u32 portsc = readl(&xhci->pr[i].portsc);
+        if (!(portsc & XHCI_PORTSC_PP)) {
+            portsc = (portsc & ~(XHCI_PORTSC_PED | XHCI_PORTSC_PR
+                                 | (XHCI_PORTSC_PLS_MASK
+                                    << XHCI_PORTSC_PLS_SHIFT)))
+                     | XHCI_PORTSC_PP;
+            writel(&xhci->pr[i].portsc, portsc);
+        }
+    }
     // Wait for port power to stabilize.
     msleep(XHCI_TIME_POSTPOWER);
 
