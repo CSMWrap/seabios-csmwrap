@@ -581,6 +581,27 @@ xhci_controller_setup(void *baseaddr)
             struct xhci_xcap *xcap = addr;
             u32 ports, name, cap = readl(&xcap->cap);
             switch (cap & 0xff) {
+            case 0x01:
+                if (cap & (1 << 16)) {
+                    writel(&xcap->cap, cap | (1 << 24));
+                    u32 end = timer_calc(1000);
+                    for (;;) {
+                        cap = readl(&xcap->cap);
+                        if (!(cap & (1 << 16)))
+                            break;
+                        if (timer_check(end)) {
+                            warn_timeout();
+                            writel(&xcap->cap, cap & ~(1 << 16));
+                            break;
+                        }
+                        yield();
+                    }
+                }
+                u32 ctrl = readl(&xcap->data[0]);
+                ctrl &= ((0x7 << 1) | (0xff << 5) | (0x7 << 17));
+                ctrl |= (0x7 << 29);
+                writel(&xcap->data[0], ctrl);
+                break;
             case 0x02:
                 name  = readl(&xcap->data[0]);
                 ports = readl(&xcap->data[1]);
