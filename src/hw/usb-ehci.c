@@ -237,10 +237,26 @@ configure_ehci(void *data)
         goto fail;
     }
 
-    // XXX - check for halted?
+    // Stop the HC and wait for it to halt before issuing reset.
+    u32 cmd = readl(&cntl->regs->usbcmd);
+    if (cmd & CMD_RUN) {
+        writel(&cntl->regs->usbcmd, cmd & ~(CMD_RUN | CMD_ASE | CMD_PSE));
+        u32 end = timer_calc(16);
+        for (;;) {
+            u32 sts = readl(&cntl->regs->usbsts);
+            if (sts & STS_HALT)
+                break;
+            if (timer_check(end)) {
+                warn_timeout();
+                PendingEHCI--;
+                goto fail;
+            }
+            yield();
+        }
+    }
 
     // Reset the HC
-    u32 cmd = readl(&cntl->regs->usbcmd);
+    cmd = readl(&cntl->regs->usbcmd);
     writel(&cntl->regs->usbcmd, (cmd & ~(CMD_ASE | CMD_PSE)) | CMD_HCRESET);
     u32 end = timer_calc(250);
     for (;;) {
