@@ -290,7 +290,21 @@ ohci_controller_setup(struct pci_device *pci)
 
     pci_enable_busmaster(pci);
 
-    // XXX - check for and disable SMM control?
+    // Take ownership from SMM if firmware still holds the controller.
+    if (readl(&cntl->regs->control) & OHCI_CTRL_IR) {
+        writel(&cntl->regs->intrenable, OHCI_INTR_OC);
+        writel(&cntl->regs->cmdstatus, OHCI_OCR);
+        u32 end = timer_calc(5000);
+        while (readl(&cntl->regs->control) & OHCI_CTRL_IR) {
+            if (timer_check(end)) {
+                warn_timeout();
+                writel(&cntl->regs->control,
+                       readl(&cntl->regs->control) & ~OHCI_CTRL_IR);
+                break;
+            }
+            yield();
+        }
+    }
 
     // Disable interrupts
     writel(&cntl->regs->intrdisable, ~0);
