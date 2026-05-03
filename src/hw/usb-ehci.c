@@ -79,6 +79,18 @@ ehci_hub_reset(struct usbhub_s *hub, u32 port)
     // Finish reset on port
     portsc &= ~(PORT_RESET | PORT_RWC_BITS);
     writel(portreg, portsc);
+
+    u32 end = timer_calc(USB_TIME_DRSTR);
+    for (;;) {
+        portsc = readl(portreg);
+        if (!(portsc & PORT_RESET))
+            break;
+        if (timer_check(end)) {
+            warn_timeout();
+            return -1;
+        }
+        yield();
+    }
     msleep(EHCI_TIME_POSTRESET);
 
     portsc = readl(portreg);
