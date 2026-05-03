@@ -1167,7 +1167,7 @@ xhci_send_pipe(struct usb_pipe *p, int dir, const void *cmd
     }
 
     int cc = xhci_event_wait(xhci, &pipe->reqs, usb_xfer_time(p, datalen));
-    if (cc != CC_SUCCESS) {
+    if (cc != CC_SUCCESS && cc != CC_SHORT_PACKET) {
         dprintf(1, "%s: xfer failed (cc %d)\n", __func__, cc);
         return -1;
     }
