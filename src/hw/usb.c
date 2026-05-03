@@ -435,7 +435,7 @@ usb_hub_port_setup(void *data)
         msleep(5);
     }
 
-    // XXX - wait USB_TIME_ATTDB time?
+    msleep(USB_TIME_ATTDB);
 
     // Reset port and determine device speed
     mutex_lock(&hub->cntl->resetlock);
