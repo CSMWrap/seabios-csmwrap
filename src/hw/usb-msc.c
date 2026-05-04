@@ -115,6 +115,8 @@ usb_process_op(struct disk_op_s *op)
     if (csw.bCSWStatus == 2)
         goto fail;
 
+    if (csw.dCSWDataResidue > bytes)
+        csw.dCSWDataResidue = bytes;
     if (blocksize)
         op->count -= csw.dCSWDataResidue / blocksize;
     return DISK_RET_EBADTRACK;
