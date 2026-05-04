@@ -182,10 +182,15 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
         ahci_port_writel(ctrl, pnr, PORT_CMD, val & ~PORT_CMD_START);
 
         // waits for PxCMD.CR to clear to 0
-        while (1) {
+        u32 cr_end = timer_calc(AHCI_RESET_TIMEOUT);
+        for (;;) {
             val = ahci_port_readl(ctrl, pnr, PORT_CMD);
             if ((val & PORT_CMD_LIST_ON) == 0)
                 break;
+            if (timer_check(cr_end)) {
+                warn_timeout();
+                break;
+            }
             yield();
         }
 
