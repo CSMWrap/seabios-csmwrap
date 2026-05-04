@@ -15,7 +15,7 @@
 #include "std/disk.h" // DISK_RET_
 #include "string.h" // memset
 #include "util.h" // boot_add_hd
-#include "x86.h" // readl
+#include "x86.h" // readl, __fls
 
 #include "nvme.h"
 #include "nvme-int.h"
@@ -334,6 +334,17 @@ nvme_destroy_sq(struct nvme_sq *sq)
     sq->sqe = NULL;
 }
 
+/* I/O queue length capped to one page and rounded down to a power of two so
+   the head/tail wraparound mask works for any MQES value. */
+static u32
+nvme_io_queue_length(struct nvme_ctrl *ctrl)
+{
+    u32 length = 1 + (ctrl->reg->cap & 0xffff);
+    if (length > NVME_PAGE_SIZE / sizeof(struct nvme_cqe))
+        length = NVME_PAGE_SIZE / sizeof(struct nvme_cqe);
+    return 1U << __fls(length);
+}
+
 /* Issue an admin command with no data buffer and a single dword[10]. */
 static int
 nvme_admin_simple(struct nvme_ctrl *ctrl, u8 opc, u32 dw10)
@@ -354,9 +365,7 @@ nvme_create_io_cq(struct nvme_ctrl *ctrl, struct nvme_cq *cq, u16 q_idx)
 {
     int rc;
     struct nvme_sqe *cmd_create_cq;
-    u32 length = 1 + (ctrl->reg->cap & 0xffff);
-    if (length > NVME_PAGE_SIZE / sizeof(struct nvme_cqe))
-        length = NVME_PAGE_SIZE / sizeof(struct nvme_cqe);
+    u32 length = nvme_io_queue_length(ctrl);
 
     rc = nvme_init_cq(ctrl, cq, q_idx, length);
     if (rc) {
@@ -398,9 +407,7 @@ nvme_create_io_sq(struct nvme_ctrl *ctrl, struct nvme_sq *sq, u16 q_idx, struct 
 {
     int rc;
     struct nvme_sqe *cmd_create_sq;
-    u32 length = 1 + (ctrl->reg->cap & 0xffff);
-    if (length > NVME_PAGE_SIZE / sizeof(struct nvme_cqe))
-        length = NVME_PAGE_SIZE / sizeof(struct nvme_cqe);
+    u32 length = nvme_io_queue_length(ctrl);
 
     rc = nvme_init_sq(ctrl, sq, q_idx, length, cq);
     if (rc) {
