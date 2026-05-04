@@ -334,6 +334,20 @@ nvme_destroy_sq(struct nvme_sq *sq)
     sq->sqe = NULL;
 }
 
+/* Issue an admin command with no data buffer and a single dword[10]. */
+static int
+nvme_admin_simple(struct nvme_ctrl *ctrl, u8 opc, u32 dw10)
+{
+    struct nvme_sqe *cmd = nvme_get_next_sqe(&ctrl->admin_sq, opc, NULL,
+                                             NULL, NULL);
+    if (!cmd)
+        return -1;
+    cmd->dword[10] = dw10;
+    nvme_commit_sqe(&ctrl->admin_sq);
+    struct nvme_cqe cqe = nvme_wait(&ctrl->admin_sq);
+    return nvme_is_cqe_success(&cqe) ? 0 : -1;
+}
+
 /* Returns 0 on success. */
 static int
 nvme_create_io_cq(struct nvme_ctrl *ctrl, struct nvme_cq *cq, u16 q_idx)
@@ -542,14 +556,27 @@ nvme_create_io_queues(struct nvme_ctrl *ctrl)
         goto err;
 
     if (nvme_create_io_sq(ctrl, &ctrl->io_sq, 2, &ctrl->io_cq))
-        goto err_free_cq;
+        goto err_delete_cq;
 
     return 0;
 
- err_free_cq:
+ err_delete_cq:
+    nvme_admin_simple(ctrl, NVME_SQE_OPC_ADMIN_DELETE_IO_CQ, 1);
     nvme_destroy_cq(&ctrl->io_cq);
  err:
     return -1;
+}
+
+/* Tear down the I/O queues we created in nvme_create_io_queues. */
+static void
+nvme_destroy_io_queues(struct nvme_ctrl *ctrl)
+{
+    if (!ctrl->io_sq.sqe)
+        return;
+    nvme_admin_simple(ctrl, NVME_SQE_OPC_ADMIN_DELETE_IO_SQ, 1);
+    nvme_admin_simple(ctrl, NVME_SQE_OPC_ADMIN_DELETE_IO_CQ, 1);
+    nvme_destroy_sq(&ctrl->io_sq);
+    nvme_destroy_cq(&ctrl->io_cq);
 }
 
 /* Waits for CSTS.RDY to match rdy. Returns 0 on success. */
@@ -620,7 +647,7 @@ nvme_controller_enable(struct nvme_ctrl *ctrl)
 
     if (nvme_wait_csts_rdy(ctrl, 1)) {
         dprintf(2, "NVMe fatal error while enabling controller\n");
-        goto err_destroy_admin_sq;
+        goto err_disable;
     }
 
     /* The admin queue is set up and the controller is ready. Let's figure out
@@ -630,7 +657,7 @@ nvme_controller_enable(struct nvme_ctrl *ctrl)
 
     if (!identify) {
         dprintf(2, "NVMe couldn't identify controller.\n");
-        goto err_destroy_admin_sq;
+        goto err_disable;
     }
 
     dprintf(3, "NVMe has %u namespace%s.\n",
@@ -643,7 +670,7 @@ nvme_controller_enable(struct nvme_ctrl *ctrl)
     if ((ctrl->ns_count == 0) || nvme_create_io_queues(ctrl)) {
         /* No point to continue, if the controller says it doesn't have
            namespaces or we couldn't create I/O queues. */
-        goto err_destroy_admin_sq;
+        goto err_disable;
     }
 
     /* Populate namespace IDs */
@@ -655,6 +682,10 @@ nvme_controller_enable(struct nvme_ctrl *ctrl)
     dprintf(3, "NVMe initialization complete!\n");
     return 0;
 
+ err_disable:
+    nvme_destroy_io_queues(ctrl);
+    ctrl->reg->cc = 0;
+    nvme_wait_csts_rdy(ctrl, 0);
  err_destroy_admin_sq:
     nvme_destroy_sq(&ctrl->admin_sq);
  err_destroy_admin_cq:
