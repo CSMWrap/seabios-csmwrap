@@ -236,7 +236,7 @@ static u64 scsilun2u64(struct scsi_lun *scsi_lun)
     int i;
     u64 ret = 0;
     for (i = 0; i < ARRAY_SIZE(scsi_lun->lun); i++)
-        ret |= be16_to_cpu(scsi_lun->lun[i]) << (16 * i);
+        ret |= (u64)be16_to_cpu(scsi_lun->lun[i]) << (16 * i);
     return ret;
 }
 
