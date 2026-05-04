@@ -223,7 +223,7 @@ sdcard_pio_app(struct sdhci_s *regs, int cmd, u32 *param)
 
 // Send a command to the card which transfers data.
 static int
-sdcard_pio_transfer(struct sddrive_s *drive, int cmd, u32 addr
+sdcard_pio_transfer(struct sddrive_s *drive, int cmd, u64 addr
                     , void *data, int count)
 {
     // Send command
@@ -235,6 +235,10 @@ sdcard_pio_transfer(struct sddrive_s *drive, int cmd, u32 addr
     writew(&drive->regs->transfer_mode, tmode);
     if (!(drive->card_type & SF_HIGHCAPACITY))
         addr *= DISK_SECTOR_SIZE;
+    if (addr > 0xffffffff) {
+        dprintf(1, "sdcard address out of range\n");
+        return -1;
+    }
     u32 param[4] = { addr };
     int ret = sdcard_pio(drive->regs, cmd, param);
     if (ret)
