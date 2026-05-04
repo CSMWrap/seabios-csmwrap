@@ -191,7 +191,7 @@ reset_uhci(struct usb_uhci_s *cntl, u16 bdf)
     }
 
     // Clear status bits and disable interrupts and commands.
-    outw(0xff, cntl->iobase + USBSTS);
+    outw(0x1f, cntl->iobase + USBSTS);
     outw(0, cntl->iobase + USBINTR);
     outw(0, cntl->iobase + USBCMD);
 }
