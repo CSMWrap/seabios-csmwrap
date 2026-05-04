@@ -686,7 +686,6 @@ nvme_controller_enable(struct nvme_ctrl *ctrl)
     nvme_destroy_io_queues(ctrl);
     ctrl->reg->cc = 0;
     nvme_wait_csts_rdy(ctrl, 0);
- err_destroy_admin_sq:
     nvme_destroy_sq(&ctrl->admin_sq);
  err_destroy_admin_cq:
     nvme_destroy_cq(&ctrl->admin_cq);
