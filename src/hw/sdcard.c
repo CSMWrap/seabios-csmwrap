@@ -99,6 +99,8 @@ struct sdhci_s {
 #define SD_CAPLO_V33             (1<<24)
 #define SD_CAPLO_V30             (1<<25)
 #define SD_CAPLO_V18             (1<<26)
+#define SD_CAPLO_SLOT_TYPE_MASK  (3<<30)
+#define SD_CAPLO_SLOT_EMBEDDED   (1<<30)
 #define SD_CAPLO_BASECLOCK_SHIFT 8
 #define SD_CAPLO_BASECLOCK_MASK  0xff
 
@@ -491,14 +493,18 @@ sdcard_card_setup(struct sddrive_s *drive, int volt, int prio)
 static void
 sdcard_controller_setup(struct sdhci_s *regs, int prio)
 {
-    // Initialize controller
+    u32 cap_lo = readl(&regs->cap_lo);
     u32 present_state = readl(&regs->present_state);
-    if (!(present_state & SP_CARD_INSERTED))
-        // No card present
+    // Embedded slots (eMMC soldered down, no CD pin) leave Card_Inserted
+    // wired to zero; trust the SDHCI Slot Type and probe regardless. For
+    // removable slots, the bit is meaningful and an empty reading skips a
+    // slot init that would only time out anyway.
+    if (!(present_state & SP_CARD_INSERTED)
+        && (cap_lo & SD_CAPLO_SLOT_TYPE_MASK) != SD_CAPLO_SLOT_EMBEDDED)
         return;
     dprintf(3, "sdhci@%p ver=%x cap=%x %x\n", regs
             , readw(&regs->controller_version)
-            , readl(&regs->cap_lo), readl(&regs->cap_hi));
+            , cap_lo, readl(&regs->cap_hi));
     sdcard_reset(regs, SRF_ALL);
     writew(&regs->irq_signal, 0);
     writew(&regs->irq_enable, 0x01ff);
