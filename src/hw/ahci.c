@@ -23,7 +23,7 @@
 #define AHCI_REQUEST_TIMEOUT 32000 // 32 seconds max for IDE ops
 #define AHCI_RESET_TIMEOUT     500 // 500 miliseconds
 #define AHCI_LINK_TIMEOUT     2000 // 2 seconds, matches libata normal debounce
-#define AHCI_DETECT_TIMEOUT     50 // 50 miliseconds, time to see a device on the wire
+#define AHCI_DETECT_TIMEOUT    200 // 200 miliseconds, time to see a device on the wire
 
 // prepare sata command fis
 static void sata_prep_simple(struct sata_cmd_fis *fis, u8 command)
