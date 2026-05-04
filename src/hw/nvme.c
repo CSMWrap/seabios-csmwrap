@@ -720,6 +720,11 @@ nvme_controller_setup(void *opaque)
         goto err;
     }
 
+    if (reg->cap & NVME_CAP_MPSMIN_MASK) {
+        dprintf(3, "Controller requires page size > 4 KiB. Skipping.\n");
+        goto err;
+    }
+
     struct nvme_ctrl *ctrl = malloc_high(sizeof(*ctrl));
     if (!ctrl) {
         warn_noalloc();
