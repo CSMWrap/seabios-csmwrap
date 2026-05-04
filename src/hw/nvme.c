@@ -613,15 +613,18 @@ nvme_wait_csts_rdy(struct nvme_ctrl *ctrl, unsigned rdy)
     return 0;
 }
 
-/* If the controller is already enabled, request normal shutdown and wait for
-   CSTS.SHST to indicate completion before performing the controller reset. */
+/* If the controller is enabled, request normal shutdown via CC.SHN and wait
+   for CSTS.SHST to indicate completion before clearing CC.EN. */
 static void
 nvme_controller_shutdown(struct nvme_ctrl *ctrl)
 {
     if (!(ctrl->reg->csts & NVME_CSTS_RDY))
         return;
 
-    ctrl->reg->cc = NVME_CC_SHN_NORMAL;
+    u32 cc = ctrl->reg->cc;
+    cc = (cc & ~NVME_CC_SHN_MASK) | NVME_CC_SHN_NORMAL;
+    ctrl->reg->cc = cc;
+
     u32 const max_to = 500 /* ms */ * ((ctrl->reg->cap >> 24) & 0xFFU);
     u32 to = timer_calc(max_to);
     while ((ctrl->reg->csts & NVME_CSTS_SHST_MASK) != NVME_CSTS_SHST_COMPLETE) {

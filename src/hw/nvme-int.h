@@ -177,6 +177,7 @@ union nvme_identify {
 #define NVME_CSTS_FATAL         (1U << 1)
 #define NVME_CSTS_RDY           (1U << 0)
 
+#define NVME_CC_SHN_MASK   (3U << 14)
 #define NVME_CC_SHN_NORMAL (1U << 14)
 #define NVME_CC_EN         (1U << 0)
 
