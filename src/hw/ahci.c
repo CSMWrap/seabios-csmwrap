@@ -111,14 +111,26 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
     struct ahci_fis_s  *fis  = port_gf->fis;
     struct ahci_list_s *list = port_gf->list;
     u32 pnr                  = port_gf->pnr;
+    u32 prdtl;
+
+    // PRDT.DBC is 22 bits, zero based.
+    if (bsize > 4*1024*1024) {
+        dprintf(1, "AHCI/%d: transfer too large (%u bytes)\n", pnr, bsize);
+        return -1;
+    }
 
     cmd->fis.reg       = 0x27;
     cmd->fis.pmp_type  = 1 << 7; /* cmd fis */
-    cmd->prdt[0].base  = (u32)buffer;
-    cmd->prdt[0].baseu = 0;
-    cmd->prdt[0].flags = bsize-1;
+    if (bsize) {
+        cmd->prdt[0].base  = (u32)buffer;
+        cmd->prdt[0].baseu = 0;
+        cmd->prdt[0].flags = bsize-1;
+        prdtl = 1;
+    } else {
+        prdtl = 0;
+    }
 
-    flags = ((1 << 16) | /* one prd entry */
+    flags = ((prdtl << 16) |
              (iswrite ? (1 << 6) : 0) |
              (isatapi ? (1 << 5) : 0) |
              (5 << 0)); /* fis length (dwords) */
