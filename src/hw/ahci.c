@@ -235,6 +235,20 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
 
 #define CDROM_CDB_SIZE 12
 
+// Issue a prepared ATAPI command against op->buf_fl; buffer must be word aligned
+static int
+ahci_atapi_issue(struct ahci_port_s *port_gf, struct disk_op_s *op,
+                 int blocksize)
+{
+    struct ahci_cmd_s *cmd = port_gf->cmd;
+    scsi_fill_cmd(op, cmd->atapi, CDROM_CDB_SIZE);
+    sata_prep_atapi(&cmd->fis, blocksize);
+    int rc = ahci_command(port_gf, 0, 1, op->buf_fl, op->count * blocksize);
+    if (rc < 0)
+        return DISK_RET_EBADTRACK;
+    return DISK_RET_SUCCESS;
+}
+
 int ahci_atapi_process_op(struct disk_op_s *op)
 {
     if (! CONFIG_AHCI)
@@ -249,10 +263,31 @@ int ahci_atapi_process_op(struct disk_op_s *op)
     int blocksize = scsi_fill_cmd(op, cmd->atapi, CDROM_CDB_SIZE);
     if (blocksize < 0)
         return default_process_op(op);
-    sata_prep_atapi(&cmd->fis, blocksize);
-    int rc = ahci_command(port_gf, 0, 1, op->buf_fl, op->count * blocksize);
-    if (rc < 0)
+
+    // if caller's buffer is word aligned, use it directly
+    if (((u32) op->buf_fl & 1) == 0)
+        return ahci_atapi_issue(port_gf, op, blocksize);
+
+    // CMD_SCSI carries a pre-built CDB we can't safely split.
+    if (op->command != CMD_READ || blocksize > CDROM_SECTOR_SIZE)
         return DISK_RET_EBADTRACK;
+
+    // Use a word aligned buffer for AHCI I/O
+    struct disk_op_s localop = *op;
+    u8 *alignedbuf_fl = bounce_buf_fl;
+    u8 *position = op->buf_fl;
+    localop.buf_fl = alignedbuf_fl;
+    localop.count = 1;
+
+    u16 block;
+    for (block = 0; block < op->count; block++) {
+        int rc = ahci_atapi_issue(port_gf, &localop, blocksize);
+        if (rc)
+            return rc;
+        memcpy_fl(position, alignedbuf_fl, blocksize);
+        position += blocksize;
+        localop.lba++;
+    }
     return DISK_RET_SUCCESS;
 }
 
