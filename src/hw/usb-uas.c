@@ -239,6 +239,8 @@ usb_uas_setup(struct usbdevice_s *usbdev)
              && desc + desc[0] <= end; desc += desc[0]) {
         switch (desc[1]) {
         case USB_DT_ENDPOINT:
+            if (desc[0] < sizeof(struct usb_endpoint_descriptor))
+                goto fail;
             ep = (void*)desc;
             break;
         case USB_DT_ENDPOINT_COMPANION:
