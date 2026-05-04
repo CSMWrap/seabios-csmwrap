@@ -452,6 +452,8 @@ nvme_io_xfer(struct nvme_namespace *ns, u64 lba, void *prp1, void *prp2,
                                                  write ? NVME_SQE_OPC_IO_WRITE
                                                        : NVME_SQE_OPC_IO_READ,
                                                  NULL, prp1, prp2);
+    if (!io_read)
+        return -1;
     io_read->nsid = ns->ns_id;
     io_read->dword[10] = (u32)lba;
     io_read->dword[11] = (u32)(lba >> 32);
