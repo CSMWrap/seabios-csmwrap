@@ -207,12 +207,15 @@ struct usb_endpoint_descriptor *
 usb_find_desc(struct usbdevice_s *usbdev, int type, int dir)
 {
     struct usb_endpoint_descriptor *epdesc = (void*)&usbdev->iface[1];
+    void *end = (void*)usbdev->iface + usbdev->imax;
     for (;;) {
-        if ((void*)epdesc >= (void*)usbdev->iface + usbdev->imax
-            || epdesc->bDescriptorType == USB_DT_INTERFACE) {
+        if ((void*)epdesc + 2 > end
+            || epdesc->bLength < 2
+            || (void*)epdesc + epdesc->bLength > end
+            || epdesc->bDescriptorType == USB_DT_INTERFACE)
             return NULL;
-        }
         if (epdesc->bDescriptorType == USB_DT_ENDPOINT
+            && epdesc->bLength >= sizeof(*epdesc)
             && (epdesc->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == dir
             && (epdesc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == type)
             return epdesc;
