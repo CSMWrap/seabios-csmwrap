@@ -240,9 +240,11 @@ sdcard_pio_transfer(struct sddrive_s *drive, int cmd, u32 addr
     // Read/write data
     u16 cbit = isread ? SI_READ_READY : SI_WRITE_READY;
     while (count--) {
-        ret = sdcard_waitw(&drive->regs->irq_status, cbit);
+        ret = sdcard_waitw(&drive->regs->irq_status, SI_ERROR|cbit);
         if (ret < 0)
             return ret;
+        if (ret & SI_ERROR)
+            goto data_error;
         writew(&drive->regs->irq_status, cbit);
         int i;
         for (i=0; i<DISK_SECTOR_SIZE/4; i++) {
@@ -254,11 +256,19 @@ sdcard_pio_transfer(struct sddrive_s *drive, int cmd, u32 addr
         }
     }
     // Complete command
-    ret = sdcard_waitw(&drive->regs->irq_status, SI_TRANS_DONE);
+    ret = sdcard_waitw(&drive->regs->irq_status, SI_ERROR|SI_TRANS_DONE);
     if (ret < 0)
         return ret;
+    if (ret & SI_ERROR)
+        goto data_error;
     writew(&drive->regs->irq_status, SI_TRANS_DONE);
     return 0;
+data_error: ;
+    u16 err = readw(&drive->regs->error_irq_status);
+    dprintf(3, "sdcard_pio_transfer data error (code=%x)\n", err);
+    sdcard_reset(drive->regs, SRF_CMD|SRF_DATA);
+    writew(&drive->regs->error_irq_status, err);
+    return -1;
 }
 
 // Read/write a block of data to/from the card.
