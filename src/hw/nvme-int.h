@@ -176,7 +176,9 @@ union nvme_identify {
 
 #define NVME_CC_EN        (1U <<  0)
 
+#define NVME_SQE_OPC_ADMIN_DELETE_IO_SQ 0U
 #define NVME_SQE_OPC_ADMIN_CREATE_IO_SQ 1U
+#define NVME_SQE_OPC_ADMIN_DELETE_IO_CQ 4U
 #define NVME_SQE_OPC_ADMIN_CREATE_IO_CQ 5U
 #define NVME_SQE_OPC_ADMIN_IDENTIFY     6U
 
