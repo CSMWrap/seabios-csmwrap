@@ -322,6 +322,7 @@ scsi_drive_setup(struct drive_s *drive, const char *s, int prio)
     memset(&dop, 0, sizeof(dop));
     dop.drive_fl = drive;
     struct cdbres_inquiry data;
+    memset(&data, 0, sizeof(data));
     int ret = cdb_get_inquiry(&dop, &data);
     if (ret)
         return ret;
