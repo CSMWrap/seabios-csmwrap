@@ -361,6 +361,8 @@ scsi_drive_setup(struct drive_s *drive, const char *s, int prio)
         dprintf(3, "%s: >2TB Detected trying READCAP(16)\n", s);
         struct cdbres_read_capacity_16 capdata16;
         ret = cdb_read_capacity16(&dop, &capdata16);
+        if (ret)
+            return ret;
         drive->blksize = be32_to_cpu(capdata16.blksize);
         drive->sectors = be64_to_cpu(capdata16.sectors) + 1;
     } else {
