@@ -22,7 +22,8 @@
 
 #define AHCI_REQUEST_TIMEOUT 32000 // 32 seconds max for IDE ops
 #define AHCI_RESET_TIMEOUT     500 // 500 miliseconds
-#define AHCI_LINK_TIMEOUT       10 // 10 miliseconds
+#define AHCI_LINK_TIMEOUT     2000 // 2 seconds, matches libata normal debounce
+#define AHCI_DETECT_TIMEOUT     50 // 50 miliseconds, time to see a device on the wire
 
 // prepare sata command fis
 static void sata_prep_simple(struct sata_cmd_fis *fis, u8 command)
@@ -448,11 +449,18 @@ static int ahci_port_setup(struct ahci_port_s *port)
     cmd |= PORT_CMD_SPIN_UP | PORT_CMD_POWER_ON | PORT_CMD_ICC_ACTIVE;
     ahci_port_writel(ctrl, pnr, PORT_CMD, cmd);
     u32 end = timer_calc(AHCI_LINK_TIMEOUT);
+    u32 detect_end = timer_calc(AHCI_DETECT_TIMEOUT);
     for (;;) {
         stat = ahci_port_readl(ctrl, pnr, PORT_SCR_STAT);
         if ((stat & 0x07) == 0x03) {
             dprintf(2, "AHCI/%d: link up\n", port->pnr);
             break;
+        }
+        // PxSSTS.DET stays at 0h when no device is connected. Don't burn the
+        // full link-up budget on an empty port.
+        if (timer_check(detect_end) && (stat & 0x0f) == 0) {
+            dprintf(2, "AHCI/%d: no device\n", port->pnr);
+            return -1;
         }
         if (timer_check(end)) {
             dprintf(2, "AHCI/%d: link down\n", port->pnr);
