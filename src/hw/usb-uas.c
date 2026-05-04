@@ -91,6 +91,8 @@ struct uasdrive_s {
     u32 lun;
 };
 
+u16 UsbUasNextTag VARLOW;
+
 int
 uas_process_op(struct disk_op_s *op)
 {
@@ -100,10 +102,12 @@ uas_process_op(struct disk_op_s *op)
     struct uasdrive_s *drive_gf = container_of(
         op->drive_fl, struct uasdrive_s, drive);
 
+    u16 tag = GET_LOW(UsbUasNextTag) + 1;
+    SET_LOW(UsbUasNextTag, tag);
     uas_ui ui;
     memset(&ui, 0, sizeof(ui));
     ui.hdr.id = UAS_UI_COMMAND;
-    ui.hdr.tag = 0xdead;
+    ui.hdr.tag = tag;
     ui.command.lun[1] = GET_GLOBALFLAT(drive_gf->lun);
     int blocksize = scsi_fill_cmd(op, ui.command.cdb, sizeof(ui.command.cdb));
     if (blocksize < 0)
@@ -121,6 +125,10 @@ uas_process_op(struct disk_op_s *op)
                         USB_DIR_IN, MAKE_FLATPTR(GET_SEG(SS), &ui), sizeof(ui));
     if (ret) {
         dprintf(1, "uas: status recv fail");
+        goto fail;
+    }
+    if (ui.hdr.tag != tag) {
+        dprintf(1, "uas: status ui tag mismatch");
         goto fail;
     }
 
@@ -153,6 +161,10 @@ uas_process_op(struct disk_op_s *op)
                         USB_DIR_IN, MAKE_FLATPTR(GET_SEG(SS), &ui), sizeof(ui));
     if (ret) {
         dprintf(1, "uas: status recv fail");
+        goto fail;
+    }
+    if (ui.hdr.tag != tag) {
+        dprintf(1, "uas: status ui tag mismatch");
         goto fail;
     }
     if (ui.hdr.id != UAS_UI_SENSE) {
