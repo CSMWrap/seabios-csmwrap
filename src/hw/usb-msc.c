@@ -22,6 +22,8 @@ struct usbdrive_s {
     int lun;
 };
 
+u32 UsbMscNextTag VARLOW;
+
 
 /****************************************************************
  * Bulk-only drive command processing
@@ -80,8 +82,10 @@ usb_process_op(struct disk_op_s *op)
     if (blocksize < 0)
         return default_process_op(op);
     u32 bytes = blocksize * op->count;
+    u32 tag = GET_LOW(UsbMscNextTag) + 1;
+    SET_LOW(UsbMscNextTag, tag);
     cbw.dCBWSignature = CBW_SIGNATURE;
-    cbw.dCBWTag = 999; // XXX
+    cbw.dCBWTag = tag;
     cbw.dCBWDataTransferLength = bytes;
     cbw.bmCBWFlags = scsi_is_read(op) ? USB_DIR_IN : USB_DIR_OUT;
     cbw.bCBWLUN = GET_GLOBALFLAT(udrive_gf->lun);
@@ -107,7 +111,7 @@ usb_process_op(struct disk_op_s *op)
     if (ret)
         goto fail;
 
-    if (csw.dCSWSignature != CSW_SIGNATURE)
+    if (csw.dCSWSignature != CSW_SIGNATURE || csw.dCSWTag != tag)
         goto fail;
 
     if (!csw.bCSWStatus)
