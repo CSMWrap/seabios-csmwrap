@@ -187,12 +187,18 @@ scsi_is_ready(struct disk_op_s *op)
             break;
 
         struct cdbres_request_sense sense;
+        memset(&sense, 0, sizeof(sense));
         ret = cdb_get_sense(op, &sense);
         if (ret)
             // Error - retry.
             continue;
 
-        // Sense succeeded.
+        // Require fixed-format sense data and ASC/ASCQ within the response.
+        if ((sense.errcode & 0x7f) != 0x70 && (sense.errcode & 0x7f) != 0x71)
+            continue;
+        if (sense.additional < 6)
+            continue;
+
         if (sense.asc == 0x3a) { /* MEDIUM NOT PRESENT */
             tries--;
             dprintf(1, "Device reports MEDIUM NOT PRESENT - %d tries left\n",
