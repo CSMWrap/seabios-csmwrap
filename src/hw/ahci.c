@@ -238,6 +238,11 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
                 yield();
             }
 
+            // Clear PxSERR.DIAG.X so the post-reset D2H Register FIS can
+            // update PxTFD
+            val = ahci_port_readl(ctrl, pnr, PORT_SCR_ERR);
+            ahci_port_writel(ctrl, pnr, PORT_SCR_ERR, val);
+
             // Wait for device to clear post-reset BSY before re-enabling ST
             u32 tfd_end = timer_calc(AHCI_LINK_TIMEOUT);
             for (;;) {
