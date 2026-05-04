@@ -169,7 +169,8 @@ union nvme_identify {
 
 /* NVMe constants */
 
-#define NVME_CAP_CSS_NVME (1ULL << 37)
+#define NVME_CAP_CSS_NVME    (1ULL << 37)
+#define NVME_CAP_MPSMIN_MASK (0xFULL << 48)
 
 #define NVME_CSTS_SHST_MASK     (3U << 2)
 #define NVME_CSTS_SHST_COMPLETE (2U << 2)
