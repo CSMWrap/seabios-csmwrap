@@ -132,16 +132,16 @@ fail:
 }
 
 static int
-usb_msc_maxlun(struct usb_pipe *pipe)
+usb_msc_maxlun(struct usbdevice_s *usbdev)
 {
     struct usb_ctrlrequest req;
     req.bRequestType = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
     req.bRequest = 0xfe;
     req.wValue = 0;
-    req.wIndex = 0;
+    req.wIndex = usbdev->iface->bInterfaceNumber;
     req.wLength = 1;
     unsigned char maxlun;
-    int ret = usb_send_default_control(pipe, &req, &maxlun);
+    int ret = usb_send_default_control(usbdev->defpipe, &req, &maxlun);
     if (ret)
         return 0;
     return maxlun;
@@ -211,7 +211,7 @@ usb_msc_setup(struct usbdevice_s *usbdev)
     if (!inpipe || !outpipe)
         goto fail;
 
-    int maxlun = usb_msc_maxlun(usbdev->defpipe);
+    int maxlun = usb_msc_maxlun(usbdev);
     int lun, pipesused = 0;
     for (lun = 0; lun < maxlun + 1; lun++) {
         int ret = usb_msc_lun_setup(inpipe, outpipe, usbdev, lun);
