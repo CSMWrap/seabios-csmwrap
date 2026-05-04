@@ -107,6 +107,9 @@ usb_process_op(struct disk_op_s *op)
     if (ret)
         goto fail;
 
+    if (csw.dCSWSignature != CSW_SIGNATURE)
+        goto fail;
+
     if (!csw.bCSWStatus)
         return DISK_RET_SUCCESS;
     if (csw.bCSWStatus == 2)
