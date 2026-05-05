@@ -577,9 +577,12 @@ xhci_controller_setup(void *baseaddr)
     if (xhci->xcap) {
         u32 off;
         void *addr = baseaddr + xhci->xcap;
+        int loops = 64;
         do {
             struct xhci_xcap *xcap = addr;
             u32 ports, name, cap = readl(&xcap->cap);
+            if (cap == ~0u)
+                break;
             switch (cap & 0xff) {
             case 0x01:
                 if (cap & (1 << 16)) {
@@ -635,7 +638,7 @@ xhci_controller_setup(void *baseaddr)
             }
             off = (cap >> 8) & 0xff;
             addr += off << 2;
-        } while (off > 0);
+        } while (off > 0 && --loops);
     }
 
     u32 pagesize = readl(&xhci->op->pagesize);
