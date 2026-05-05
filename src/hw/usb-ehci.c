@@ -310,8 +310,18 @@ configure_ehci(void *data)
         return;
 
     // No devices found - shutdown and free controller.
-    writel(&cntl->regs->usbcmd, cmd & ~CMD_RUN);
-    msleep(4);  // 2ms to stop reading memory - XXX
+    writel(&cntl->regs->usbcmd, cmd & ~(CMD_RUN | CMD_ASE | CMD_PSE));
+    u32 halt_end = timer_calc(16);
+    for (;;) {
+        u32 sts = readl(&cntl->regs->usbsts);
+        if (sts & STS_HALT)
+            break;
+        if (timer_check(halt_end)) {
+            warn_timeout();
+            break;
+        }
+        yield();
+    }
 fail:
     free(fl);
     free(intr_qh);
