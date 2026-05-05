@@ -170,7 +170,12 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
             }
             if (timer_check(end)) {
                 warn_timeout();
-                return -1;
+                // Synthesize a failing task file so the error
+                // recovery block below runs, draining the port and
+                // issuing a COMRESET if the device is still BSY.
+                status = ATA_CB_STAT_ERR;
+                error = 0;
+                break;
             }
             yield();
         }
