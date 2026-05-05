@@ -463,9 +463,10 @@ usb_hub_port_setup(void *data)
     // Configure the device
     int count = configure_usb_device(usbdev);
     usb_free_pipe(usbdev, usbdev->defpipe);
-    if (!count)
+    if (count <= 0)
         hub->op->disconnect(hub, port);
-    hub->devcount += count;
+    else
+        hub->devcount += count;
 done:
     hub->threads--;
     free(usbdev);
