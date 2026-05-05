@@ -224,6 +224,37 @@ static int ahci_command(struct ahci_port_s *port_gf, int iswrite, int isatapi,
             ahci_port_writel(ctrl, pnr, PORT_SCR_CTL, val | 1);
             mdelay (1);
             ahci_port_writel(ctrl, pnr, PORT_SCR_CTL, val);
+
+            // Wait for link to come back up
+            u32 link_end = timer_calc(AHCI_LINK_TIMEOUT);
+            for (;;) {
+                u32 stat = ahci_port_readl(ctrl, pnr, PORT_SCR_STAT);
+                if ((stat & 0x07) == 0x03)
+                    break;
+                if (timer_check(link_end)) {
+                    warn_timeout();
+                    break;
+                }
+                yield();
+            }
+
+            // Clear PxSERR.DIAG.X so the post-reset D2H Register FIS can
+            // update PxTFD
+            val = ahci_port_readl(ctrl, pnr, PORT_SCR_ERR);
+            ahci_port_writel(ctrl, pnr, PORT_SCR_ERR, val);
+
+            // Wait for device to clear post-reset BSY before re-enabling ST
+            u32 tfd_end = timer_calc(AHCI_LINK_TIMEOUT);
+            for (;;) {
+                val = ahci_port_readl(ctrl, pnr, PORT_TFDATA);
+                if (!(val & (ATA_CB_STAT_BSY | ATA_CB_STAT_DRQ)))
+                    break;
+                if (timer_check(tfd_end)) {
+                    warn_timeout();
+                    break;
+                }
+                yield();
+            }
         }
 
         // Sets PxCMD.ST to 1 to enable issuing new commands
