@@ -172,10 +172,14 @@ union nvme_identify {
 #define NVME_CAP_CSS_NVME    (1ULL << 37)
 #define NVME_CAP_MPSMIN_MASK (0xFULL << 48)
 
-#define NVME_CSTS_FATAL   (1U <<  1)
-#define NVME_CSTS_RDY     (1U <<  0)
+#define NVME_CSTS_SHST_MASK     (3U << 2)
+#define NVME_CSTS_SHST_COMPLETE (2U << 2)
+#define NVME_CSTS_FATAL         (1U << 1)
+#define NVME_CSTS_RDY           (1U << 0)
 
-#define NVME_CC_EN        (1U <<  0)
+#define NVME_CC_SHN_MASK   (3U << 14)
+#define NVME_CC_SHN_NORMAL (1U << 14)
+#define NVME_CC_EN         (1U << 0)
 
 #define NVME_SQE_OPC_ADMIN_DELETE_IO_SQ 0U
 #define NVME_SQE_OPC_ADMIN_CREATE_IO_SQ 1U
