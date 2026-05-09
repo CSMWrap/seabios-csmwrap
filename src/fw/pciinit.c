@@ -654,10 +654,33 @@ pci_bios_init_bus(void)
 {
     u8 extraroots = romfile_loadint("etc/extra-pci-roots", 0);
     u8 pci_bus = 0;
+    int list_size = 0;
+    u8 *list = romfile_loadfile("etc/extra-pci-roots-list", &list_size);
 
     pci_bios_init_bus_rec(0 /* host bus */, &pci_bus);
 
-    if (extraroots) {
+    if (list && list_size > 0) {
+        /* Visit only the loader-provided roots instead of probing every
+           bus to 0xff. Sort ascending so pci_bus (also used as the running
+           counter for bridge secondaries) stays monotonic. */
+        for (int i = 1; i < list_size; i++) {
+            u8 v = list[i];
+            int j = i - 1;
+            while (j >= 0 && list[j] > v) {
+                list[j+1] = list[j];
+                j--;
+            }
+            list[j+1] = v;
+        }
+        for (int i = 0; i < list_size; i++) {
+            u8 bus = list[i];
+            if (bus <= pci_bus)
+                continue;
+            pci_bus = bus;
+            pci_bios_init_bus_rec(bus, &pci_bus);
+        }
+        free(list);
+    } else if (extraroots) {
         while (pci_bus < 0xff) {
             pci_bus++;
             pci_bios_init_bus_rec(pci_bus, &pci_bus);

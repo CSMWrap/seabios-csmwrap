@@ -25,9 +25,32 @@ pci_probe_devices(void)
     memset(busdevs, 0, sizeof(busdevs));
     struct hlist_node **pprev = &PCIDevices.first;
     int extraroots = romfile_loadint("etc/extra-pci-roots", 0);
+
+    // If the loader supplied exact root bus numbers, scan only those and
+    // any secondaries we discover; otherwise keep the legacy behaviour of
+    // probing every bus until 'extraroots' more roots are found.
+    u8 should_scan[256];
+    memset(should_scan, 0, sizeof(should_scan));
+    should_scan[0] = 1;
+    int has_list = 0;
+    {
+        int list_size = 0;
+        u8 *list = romfile_loadfile("etc/extra-pci-roots-list", &list_size);
+        if (list && list_size > 0) {
+            has_list = 1;
+            extraroots = list_size;
+            for (int i = 0; i < list_size; i++)
+                should_scan[list[i]] = 1;
+        }
+        if (list)
+            free(list);
+    }
+
     int bus = -1, lastbus = 0, rootbuses = 0, count=0;
     while (bus < 0xff && (bus < MaxPCIBus || rootbuses < extraroots)) {
         bus++;
+        if (has_list && !should_scan[bus] && busdevs[bus] == NULL)
+            continue;
         int bdf;
         foreachbdf(bdf, bus) {
             // Create new pci_device struct and add to list.

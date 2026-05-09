@@ -140,7 +140,7 @@ const_read_file(struct romfile_s *file, void *dst, u32 maxlen)
     return file->size;
 }
 
-static void
+void
 const_romfile_add(char *name, void *data, int size)
 {
     struct const_romfile_s *cfile = malloc_tmp(sizeof(*cfile));

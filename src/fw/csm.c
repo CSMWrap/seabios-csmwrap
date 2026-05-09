@@ -70,7 +70,19 @@ csm_maininit(struct bregs *regs)
     init_bios_proxy_addr();
 
     interface_init();
-    const_romfile_add_int("etc/extra-pci-roots", 1);
+
+    // Publish the loader-provided extra root bus list. A non-zero
+    // ExtraPciRootListPointer means CSMWrap supplied authoritative info,
+    // including the "no extras" case (Count==0). Without it we leave the
+    // romfile out of the table entirely.
+    if (csm_compat_table.ExtraPciRootListPointer) {
+        const_romfile_add_int("etc/extra-pci-roots",
+                              csm_compat_table.ExtraPciRootListCount);
+        if (csm_compat_table.ExtraPciRootListCount)
+            const_romfile_add("etc/extra-pci-roots-list",
+                              (void *)csm_compat_table.ExtraPciRootListPointer,
+                              csm_compat_table.ExtraPciRootListCount);
+    }
     pci_probe_devices();
 
     csm_compat_table.PnPInstallationCheckSegment = SEG_BIOS;
